@@ -46,8 +46,12 @@ export class Hud {
     this._text(ctx, world.score.toLocaleString('ja-JP'), w - pad, pad + S * 0.03,
       S * 0.05, '#ffffff', 'right', 'top', true);
 
-    // ウェーブ + コンボ（中央上）
-    this._text(ctx, T.waveLabel(world.wave), w * 0.5, pad, S * 0.03, '#bcd4ff', 'center', 'top');
+    // ウェーブ + コンボ（中央上）— 第二夜はステージ名も添える
+    const waveText = world.stage >= 2
+      ? `${T.stageLabel2}・${T.waveLabel(world.wave)}`
+      : T.waveLabel(world.wave);
+    this._text(ctx, waveText, w * 0.5, pad, S * 0.03,
+      world.stage >= 2 ? '#ffb3c0' : '#bcd4ff', 'center', 'top');
     if (world.comboMult > 1) {
       const pulse = 1 + 0.08 * Math.sin(this.time * 12);
       this._text(ctx, `${T.hudCombo} x${world.comboMult}`, w * 0.5, pad + S * 0.045,
@@ -70,10 +74,12 @@ export class Hud {
     const b = world.boss;
     const barW = w * 0.5, barH = S * 0.022;
     const x = (w - barW) / 2, y = S * 0.085;
-    this._text(ctx, T.bossName, w * 0.5, y - S * 0.028, S * 0.026, '#ff6bd6', 'center', 'top', true);
+    const name = b.tier === 2 ? T.bossName2 : T.bossName;
+    const nameColor = b.tier === 2 ? '#ff6b6b' : '#ff6bd6';
+    this._text(ctx, name, w * 0.5, y - S * 0.028, S * 0.026, nameColor, 'center', 'top', true);
     const total = b.maxHpTotal;
     const ratio = clamp(b.hpTotal / total, 0, 1);
-    this._bar(ctx, x, y, barW, barH, ratio, '#ff4f9d', '#2a0e2a');
+    this._bar(ctx, x, y, barW, barH, ratio, b.tier === 2 ? '#ff5f5f' : '#ff4f9d', '#2a0e2a');
     // フェーズ区切り
     ctx.save();
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2;

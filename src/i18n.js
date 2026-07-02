@@ -53,6 +53,15 @@ export const T = {
   bossName: '星 喰 イ',
   bossWeakpoint: '光る核を狙え！',
 
+  stage2Banner: '第二夜 — 紅い月',
+  stage2Sub: '空が紅く染まる…真の敵が動き出す',
+  stageLabel2: '第二夜',
+  bossIncoming2: '月喰イ、来たる',
+  bossName2: '月 喰 イ',
+  bossWeakpoint2: '紅い核を狙え！',
+  armorHint: '硬い岩は 素早い斬撃で！',
+  pickupText: '星のかけら！',
+
   victoryTitle: '夜明け',
   victorySub: '街は救われた。守護者たちに称賛を。',
   gameoverTitle: '街、陥落',

@@ -113,19 +113,36 @@ export class Background {
   update(dt) { this.time += dt; }
 
   // cityRatio: 都市HP割合(0..1) — 低いほど崩壊/炎上表現
-  draw(ctx, cityRatio) {
+  // stage: 2 のとき「第二夜」= 紅い月の夜（空と月が紅く染まる）
+  draw(ctx, cityRatio, stage = 1) {
     const { w, h } = this;
     if (this.skyCanvas) ctx.drawImage(this.skyCanvas, 0, 0, w, h);
 
-    // 月
+    // 第二夜: 空全体を紅く染める
+    if (stage >= 2) {
+      const tint = ctx.createLinearGradient(0, 0, 0, h);
+      tint.addColorStop(0, 'rgba(150,20,45,0.22)');
+      tint.addColorStop(0.6, 'rgba(120,15,40,0.14)');
+      tint.addColorStop(1, 'rgba(90,10,30,0.1)');
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // 月（第二夜は紅い月）
     const m = this.moon;
     const mg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 2.6);
-    mg.addColorStop(0, 'rgba(255,248,224,0.95)');
-    mg.addColorStop(0.25, 'rgba(255,244,210,0.5)');
-    mg.addColorStop(1, 'rgba(255,240,200,0)');
+    if (stage >= 2) {
+      mg.addColorStop(0, 'rgba(255,120,110,0.95)');
+      mg.addColorStop(0.25, 'rgba(255,90,90,0.45)');
+      mg.addColorStop(1, 'rgba(255,60,80,0)');
+    } else {
+      mg.addColorStop(0, 'rgba(255,248,224,0.95)');
+      mg.addColorStop(0.25, 'rgba(255,244,210,0.5)');
+      mg.addColorStop(1, 'rgba(255,240,200,0)');
+    }
     ctx.fillStyle = mg;
     ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 2.6, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#fff6dc';
+    ctx.fillStyle = stage >= 2 ? '#ffb3a8' : '#fff6dc';
     ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill();
 
     if (this.starCanvas) ctx.drawImage(this.starCanvas, 0, 0, w, h);

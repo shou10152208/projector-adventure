@@ -54,9 +54,9 @@ getUserMedia は**セキュアコンテキストでしか動かない** = `https
 共有リソースは team 単位（`world.score`/`cityHp`/`gauge`）、攻撃手段は player ごと。必殺技は誰か1人の両手上げ＋ゲージ満タンで発動。
 
 ### ゲームロジック
-- `game/world.js` — 中心。状態機械（`title`/`playing`/`gameover`/`victory`）、**手と敵の当たり判定**（接触=継続ダメージ、高速=斬撃の瞬間ダメージ）、スコア/コンボ、必殺ゲージ、必殺技「星の雨」、画面シェイク/フラッシュ、敵スポーンを持つ。`particles` と `audio` を**コンストラクタで受け取り**、そこへ演出を出す。
-- `game/entities.js` — `Enemy` 基底 + `Meteor`/`Shard`/`Splitter`/`Drone`/`EnemyShot`、`Shockwave`（拍手）、`Boss`（星喰イ、3フェーズ・弱点コア）。各エンティティが自分で `update(dt, world)` と `draw(ctx, world)` を持つ。ダメージは `takeDamage(amount, world, info)`。`info.silent` で継続ダメージの演出を抑制。
-- `game/waves.js` — `WaveDirector`。intro→spawning→clearing→breather→次、最終waveはボス。`getWave(n)` がウェーブ定義を返す（`BOSS_WAVE=6`）。
+- `game/world.js` — 中心。状態機械（`title`/`playing`/`gameover`/`victory`）、**手と敵の当たり判定**（接触=継続ダメージ、高速=斬撃の瞬間ダメージ）、スコア/コンボ、必殺ゲージ、必殺技「星の雨」、画面シェイク/フラッシュ、敵スポーン、`stage`（1=第一夜/2=第二夜）と `pickups`（星のかけら回収）を持つ。`particles` と `audio` を**コンストラクタで受け取り**、そこへ演出を出す。
+- `game/entities.js` — `Enemy` 基底 + `Meteor`/`Shard`/`Splitter`/`Drone`/`Armor`（接触耐性・斬撃で割る）/`Bomber`（死亡時に周囲へ連鎖爆発）/`EnemyShot`、`StarPickup`（手で触れて回収するアイテム）、`Shockwave`（拍手）、`Boss`（tier1=星喰イ 3フェーズ / tier2=月喰イ 4フェーズ+全方位ショット）。各エンティティが自分で `update(dt, world)` と `draw(ctx, world)` を持つ。ダメージは `takeDamage(amount, world, info)`。`info.silent` で継続ダメージの演出を抑制（`Armor` はこれを見て接触ダメージを軽減）。
+- `game/waves.js` — `WaveDirector`。intro→spawning→clearing→breather→次。`BOSS_WAVE=6`（星喰イ）→ 撃破で `world._beginStage2()` → `stageBreak` → wave7〜11 → `FINAL_BOSS_WAVE=12`（月喰イ、`final:true`）→ 勝利。`getWave(n)` がウェーブ定義を返す。
 
 ### 描画
 - `render/renderer.js` — レイヤー統括: 背景→カメラ薄映し→敵/ボス→守護者オーラ→粒子→ビネット→画面フラッシュ→HUD。DPRスケールと画面シェイクの transform もここ。

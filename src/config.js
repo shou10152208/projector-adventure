@@ -66,6 +66,7 @@ export const CONFIG = {
   city: {
     maxHp: 120,
     rebuildOnWave: 6,        // ウェーブ毎に都市HPを少し回復
+    rebuildOnStage: 45,      // 第二夜の開始時に大きく回復
   },
 
   // --- 敵 ---
@@ -75,9 +76,25 @@ export const CONFIG = {
     drone:   { hp: 60,  radius: 28, speed: [40, 70],   score: 220,  cityDamage: 8, fireEvery: [2.2, 4.0] },
     splitter:{ hp: 44,  radius: 30, speed: [55, 90],   score: 180,  cityDamage: 12, splits: 3 },
     shot:    { hp: 6,   radius: 11, speed: 230,        score: 20,   cityDamage: 6 },
+    // 第二夜から登場
+    armor:   { hp: 80,  radius: 32, speed: [45, 70],   score: 320,  cityDamage: 14,
+               contactResist: 0.15 }, // 触れているだけのダメージはこの倍率（斬撃・拍手で割る）
+    bomber:  { hp: 26,  radius: 24, speed: [60, 100],  score: 260,  cityDamage: 16,
+               blastRadius: 190, blastDamage: 55 },    // 倒すと周囲の敵ごと爆発（連鎖）
   },
 
-  // --- ボス 星喰イ ---
+  // --- アイテム 星のかけら（敵がときどき落とす） ---
+  pickup: {
+    dropChance: 0.16,        // 敵撃破時にドロップする確率（shot/shard は除く）
+    fallSpeed: 65,
+    radius: 20,
+    life: 9,                 // 拾わないと消えるまでの秒数
+    gaugeGain: 8,
+    cityHeal: 2,
+    score: 50,
+  },
+
+  // --- ボス 星喰イ（第一夜） / 月喰イ（第二夜・強化版） ---
   boss: {
     hpPerPhase: 900,
     phases: 3,
@@ -88,6 +105,17 @@ export const CONFIG = {
     spitCount: [5, 7, 9],
     summonEvery: [7, 5, 3.5],
     score: 5000,
+    // 第二夜ボスの上書き値
+    tier2: {
+      hpPerPhase: 1050,
+      phases: 4,
+      spitEvery: [2.2, 1.1],
+      spitCount: [6, 8, 10, 12],
+      summonEvery: [6, 4.5, 3.2, 2.6],
+      ringEvery: 6.5,          // 全方位ショット（噴水状に降り注ぐ）の間隔
+      ringCount: 10,
+      score: 12000,
+    },
   },
 
   // --- コンボ ---

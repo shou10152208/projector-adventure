@@ -51,7 +51,7 @@ export class Renderer {
 
     ctx.clearRect(-40, -40, w + 80, h + 80);
     this.bg.update(dt);
-    this.bg.draw(ctx, world.cityHp / world.cityMaxHp);
+    this.bg.draw(ctx, world.cityHp / world.cityMaxHp, world.stage);
 
     // カメラ薄映し（自分の位置確認）
     if (CONFIG.render.showCameraUnderlay && video && video.readyState >= 2 &&
@@ -63,10 +63,11 @@ export class Renderer {
       ctx.restore();
     }
 
-    // 敵・弾・ボス・衝撃波（各エンティティが自前で描画）
+    // 敵・弾・ボス・衝撃波・アイテム（各エンティティが自前で描画）
     for (const e of world.enemies) if (e.draw) e.draw(ctx, world);
     if (world.boss && world.boss.alive) world.boss.draw(ctx, world);
     for (const s of world.shockwaves) if (s.draw) s.draw(ctx, world);
+    for (const pk of world.pickups) if (pk.alive) pk.draw(ctx, world);
 
     // 守護者オーラ
     for (const p of players) if (p.active) this._drawGuardian(ctx, p, world);

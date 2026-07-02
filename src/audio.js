@@ -152,6 +152,12 @@ export class AudioEngine {
     this._tone(520 + Math.random() * 60, 0.08, 'sine', 0.12);
   }
 
+  pickup() {
+    // 星のかけら回収のきらめき
+    this._tone(1046.5, 0.14, 'triangle', 0.2);
+    setTimeout(() => this._tone(1568, 0.2, 'sine', 0.14), 60);
+  }
+
   ultimate() {
     // 星の雨 発動
     this._sweep(200, 1400, 0.5, 'sawtooth', 0.3, this.master);

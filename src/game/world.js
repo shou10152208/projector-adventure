@@ -4,8 +4,9 @@
 // =============================================================
 
 import { CONFIG } from '../config.js';
-import { clamp, dist, approach, range } from '../util.js';
-import { Meteor, Drone, Splitter, Shockwave, Boss } from './entities.js';
+import { T } from '../i18n.js';
+import { clamp, dist, approach, range, chance } from '../util.js';
+import { Meteor, Drone, Splitter, Armor, Bomber, StarPickup, Shockwave, Boss } from './entities.js';
 import { WaveDirector } from './waves.js';
 
 export class World {
@@ -18,8 +19,11 @@ export class World {
     this.phase = 'title'; // title | playing | gameover | victory
     this.enemies = [];
     this.shockwaves = [];
+    this.pickups = [];
     this.floatTexts = [];
     this.boss = null;
+    this.stage = 1;             // 1 = 第一夜, 2 = 第二夜（紅い月）
+    this._armorHintShown = false;
 
     this.score = 0;
     this.cityMaxHp = CONFIG.city.maxHp;
@@ -61,8 +65,11 @@ export class World {
   reset() {
     this.enemies.length = 0;
     this.shockwaves.length = 0;
+    this.pickups.length = 0;
     this.floatTexts.length = 0;
     this.boss = null;
+    this.stage = 1;
+    this._armorHintShown = false;
     this.score = 0;
     this.cityHp = this.cityMaxHp;
     this.combo = 0; this.comboMult = 1; this.comboTimer = 0;
@@ -136,14 +143,19 @@ export class World {
     // 手と敵の当たり判定
     this._handleHandCollisions(sdt, players);
 
+    // アイテム（星のかけら）の回収
+    this._collectPickups(players);
+
     // 更新
     for (const e of this.enemies) e.update(sdt, this);
     if (this.boss && this.boss.alive) this.boss.update(sdt, this);
     for (const s of this.shockwaves) s.update(sdt, this);
+    for (const pk of this.pickups) pk.update(sdt, this);
 
     // 後始末
     if (this.enemies.some((e) => !e.alive)) this.enemies = this.enemies.filter((e) => e.alive);
     if (this.shockwaves.some((s) => !s.alive)) this.shockwaves = this.shockwaves.filter((s) => s.alive);
+    if (this.pickups.some((p) => !p.alive)) this.pickups = this.pickups.filter((p) => p.alive);
 
     this.particles.update(sdt);
 
@@ -222,9 +234,61 @@ export class World {
     this.gauge = Math.min(this.gaugeMax, this.gauge + CONFIG.ultimate.gainPerKill);
     this.addFloatText(e.x, e.y, `+${pts}`, info.color || '#ffffff');
     this.audio.charge();
+
+    // 星のかけらドロップ（弾・小破片は落とさない）
+    if (e.type !== 'shot' && e.type !== 'shard' && chance(CONFIG.pickup.dropChance)) {
+      this.pickups.push(new StarPickup(e.x, e.y));
+    }
   }
 
-  onBossDefeated() { this._victory(); }
+  onBossDefeated() {
+    // 第一夜ボス（星喰イ）撃破 → 第二夜へ。第二夜ボス（月喰イ）撃破 → 勝利。
+    if (this.boss && this.boss.tier === 2) this._victory();
+    else this._beginStage2();
+  }
+
+  _beginStage2() {
+    if (this.phase !== 'playing') return;
+    this.stage = 2;
+    this.cityHp = Math.min(this.cityMaxHp, this.cityHp + CONFIG.city.rebuildOnStage);
+    this.setBanner(T.stage2Banner, T.stage2Sub, 3.4, '#ff8a9a');
+    this.audio.victory();
+    for (let i = 0; i < 40; i++) {
+      this.particles.starfall(range(0, this.w), range(-40, this.h * 0.4), '255,150,150');
+    }
+    this.director.beginStageBreak(7, 4.0);
+  }
+
+  // ---------- アイテム回収 ----------
+  _collectPickups(players) {
+    if (!this.pickups.length) return;
+    const c = CONFIG.pickup;
+    for (const pk of this.pickups) {
+      if (!pk.alive) continue;
+      outer:
+      for (const p of players) {
+        if (!p.active) continue;
+        for (const key of ['left', 'right']) {
+          const hand = p.hands[key];
+          if (!hand.present) continue;
+          if (dist(hand.x, hand.y, pk.x, pk.y) < pk.radius + hand.radius) {
+            pk.alive = false;
+            this.addGauge(c.gaugeGain);
+            this.cityHp = Math.min(this.cityMaxHp, this.cityHp + c.cityHeal);
+            this.addScore(c.score);
+            this.addFloatText(pk.x, pk.y, T.pickupText, '#ffe06b');
+            this.audio.pickup();
+            for (let i = 0; i < 8; i++) {
+              this.particles.spark(pk.x, pk.y, '255,224,120', {
+                vx: range(-220, 220), vy: range(-220, 220), life: range(0.3, 0.5),
+              });
+            }
+            break outer;
+          }
+        }
+      }
+    }
+  }
 
   addScore(n) { this.score += n; }
 
@@ -314,11 +378,19 @@ export class World {
     let e;
     if (type === 'drone') e = new Drone(x, -40, speed);
     else if (type === 'splitter') e = new Splitter(x, -40, speed);
+    else if (type === 'armor') e = new Armor(x, -40, speed);
+    else if (type === 'bomber') e = new Bomber(x, -40, speed);
     else e = new Meteor(x, -40, speed);
     this.enemies.push(e);
+
+    // 初めてのよろい岩には倒し方のヒントを出す
+    if (type === 'armor' && !this._armorHintShown) {
+      this._armorHintShown = true;
+      if (!this.banner) this.setBanner(T.armorHint, null, 2.4, '#bcd4ff');
+    }
   }
 
-  spawnBoss() { this.boss = new Boss(this); }
+  spawnBoss(tier = 1) { this.boss = new Boss(this, tier); }
 
   // ---------- 終了 ----------
   _gameOver() {

@@ -263,6 +263,217 @@ export class Drone extends Enemy {
   }
 }
 
+// ---- よろい岩（触れるだけではほぼ削れない。斬撃・拍手・爆発で割る）----
+export class Armor extends Enemy {
+  constructor(x, y, speed) {
+    super('armor', x, y);
+    this.fallSpeed = speed;
+    this.driftX = range(-20, 20);
+    this.spin = range(-0.7, 0.7);
+    this.rgb = '150,195,220';
+    this.explosionSize = 1.3;
+  }
+  takeDamage(amount, world, info = {}) {
+    // silent = 手が触れているだけの継続ダメージ → ほとんど効かない
+    if (info.silent) amount *= CONFIG.enemies.armor.contactResist;
+    super.takeDamage(amount, world, info);
+  }
+  draw(ctx) {
+    ctx.save();
+    // 金属光沢のグロー
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 1.5);
+    g.addColorStop(0, `rgba(${this.rgb},0.35)`);
+    g.addColorStop(1, `rgba(${this.rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 1.5, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.translate(this.x, this.y); ctx.rotate(this.rot);
+    const r = this.radius;
+    // 装甲板（六角形の重なり）
+    ctx.fillStyle = '#232a38';
+    ctx.strokeStyle = `rgba(${this.rgb},0.9)`;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU;
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 内側の板
+    ctx.fillStyle = '#39445c';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + 0.5;
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62);
+    }
+    ctx.closePath(); ctx.fill();
+    // リベット
+    ctx.fillStyle = `rgba(${this.rgb},0.8)`;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, r * 0.07, 0, TAU); ctx.fill();
+    }
+    // HPが減るとヒビが入る
+    const dmg = 1 - this.hp / this.maxHp;
+    if (dmg > 0.25) {
+      ctx.strokeStyle = `rgba(255,220,150,${0.4 + dmg * 0.5})`;
+      ctx.lineWidth = 2;
+      const cracks = Math.floor(dmg * 5);
+      for (let i = 0; i < cracks; i++) {
+        const a = (i * 2.4) % TAU;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2);
+        ctx.lineTo(Math.cos(a + 0.5) * r * 0.6, Math.sin(a + 0.5) * r * 0.6);
+        ctx.lineTo(Math.cos(a + 0.3) * r * 0.95, Math.sin(a + 0.3) * r * 0.95);
+        ctx.stroke();
+      }
+    }
+    ctx.translate(-this.x, -this.y);
+    this._flashOverlay(ctx);
+    ctx.restore();
+  }
+}
+
+// ---- バクダン星（倒すと周囲の敵を巻き込む大爆発 → 連鎖が気持ちいい）----
+export class Bomber extends Enemy {
+  constructor(x, y, speed) {
+    super('bomber', x, y);
+    this.fallSpeed = speed;
+    this.driftX = range(-40, 40);
+    this.spin = range(-1, 1);
+    this.rgb = '255,150,60';
+    this.explosionSize = 1.7;
+  }
+  onDeath(world) {
+    const c = CONFIG.enemies.bomber;
+    world.addShake(12);
+    world.flashScreen('#ff9a3d', 0.15);
+    world.particles.explosion(this.x, this.y, this.rgb, 1.9);
+    // 周囲の敵にダメージ（バクダン同士は連鎖する）
+    for (const e of world.enemies) {
+      if (!e.alive || e === this) continue;
+      const d = dist(this.x, this.y, e.x, e.y);
+      if (d < c.blastRadius) {
+        const nx = (e.x - this.x) / (d || 1);
+        const ny = (e.y - this.y) / (d || 1);
+        e.knockback(nx, ny, 320);
+        e.takeDamage(c.blastDamage, world, { colorRgb: this.rgb, x: e.x, y: e.y });
+      }
+    }
+    if (world.boss && world.boss.alive && !world.boss.entering) {
+      const b = world.boss;
+      if (dist(this.x, this.y, b.x, b.y) < c.blastRadius + b.radius) {
+        b.takeDamage(c.blastDamage, world, { colorRgb: this.rgb, x: this.x, y: this.y });
+      }
+    }
+  }
+  afterMove(dt, world) {
+    if (Math.random() < 0.5) {
+      // 導火線の火花
+      world.particles.spark(this.x, this.y - this.radius * 1.1, '255,230,120', {
+        vx: range(-60, 60), vy: range(-90, -20), life: range(0.15, 0.3),
+      });
+    }
+  }
+  draw(ctx) {
+    ctx.save();
+    // 赤い警告パルス
+    const pulse = 0.5 + 0.5 * Math.sin(this.t * 8);
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2);
+    g.addColorStop(0, `rgba(255,90,40,${0.25 + pulse * 0.3})`);
+    g.addColorStop(1, 'rgba(255,90,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 2, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 本体（黒い球）
+    const r = this.radius;
+    const body = ctx.createRadialGradient(this.x - r * 0.3, this.y - r * 0.3, r * 0.1, this.x, this.y, r);
+    body.addColorStop(0, '#4a3a30');
+    body.addColorStop(1, '#14100c');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(255,150,60,${0.4 + pulse * 0.5})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // 導火線
+    ctx.strokeStyle = '#c9a06a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y - r);
+    ctx.quadraticCurveTo(this.x + r * 0.3, this.y - r * 1.3, this.x + r * 0.1, this.y - r * 1.45);
+    ctx.stroke();
+    // 火花
+    ctx.fillStyle = `rgba(255,240,150,${0.6 + pulse * 0.4})`;
+    ctx.beginPath(); ctx.arc(this.x + r * 0.1, this.y - r * 1.45, r * 0.18 * (1 + pulse * 0.5), 0, TAU); ctx.fill();
+    // どくろ風マーク（警告）
+    ctx.fillStyle = `rgba(255,170,80,${0.75 + pulse * 0.25})`;
+    ctx.beginPath(); ctx.arc(this.x, this.y, r * 0.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#14100c';
+    ctx.beginPath();
+    ctx.arc(this.x - r * 0.11, this.y - r * 0.05, r * 0.08, 0, TAU);
+    ctx.arc(this.x + r * 0.11, this.y - r * 0.05, r * 0.08, 0, TAU);
+    ctx.fill();
+    this._flashOverlay(ctx);
+    ctx.restore();
+  }
+}
+
+// ---- 星のかけら（アイテム: 手で触れて回収 → ゲージ+街HP回復）----
+export class StarPickup {
+  constructor(x, y) {
+    const c = CONFIG.pickup;
+    this.x = x; this.y = y;
+    this.radius = c.radius;
+    this.vy = c.fallSpeed;
+    this.life = c.life;
+    this.t = range(0, TAU);
+    this.alive = true;
+  }
+  update(dt, world) {
+    this.t += dt;
+    this.y += this.vy * dt;
+    this.x += Math.sin(this.t * 1.6) * 26 * dt;
+    this.life -= dt;
+    // 街のラインまで落ちたら静かに消える（ダメージは無し）
+    if (this.life <= 0 || this.y > world.cityLineY + 6) this.alive = false;
+    if (Math.random() < 0.25) {
+      world.particles.glow(this.x, this.y, '255,230,140', {
+        size: range(3, 7), life: range(0.2, 0.35), vy: 12,
+      });
+    }
+  }
+  draw(ctx) {
+    // 消える直前は点滅して知らせる
+    const blink = this.life < 2 ? (Math.sin(this.t * 14) > 0 ? 1 : 0.25) : 1;
+    const pulse = 0.8 + 0.2 * Math.sin(this.t * 5);
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2.4);
+    g.addColorStop(0, `rgba(255,246,200,${0.9 * pulse})`);
+    g.addColorStop(0.4, 'rgba(255,214,80,0.55)');
+    g.addColorStop(1, 'rgba(255,214,80,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 2.4, 0, TAU); ctx.fill();
+    // 星形の本体
+    ctx.fillStyle = 'rgba(255,240,170,0.95)';
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rr = i % 2 === 0 ? this.radius : this.radius * 0.45;
+      const a = this.t * 0.9 - Math.PI / 2 + (i * Math.PI) / 5;
+      const px = this.x + Math.cos(a) * rr;
+      const py = this.y + Math.sin(a) * rr;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
 // ---- 敵弾（はじき返し可能）----
 export class EnemyShot extends Enemy {
   constructor(x, y, vx, speed) {
@@ -339,10 +550,13 @@ export class Shockwave {
   }
 }
 
-// ---- ボス 星喰イ ----
+// ---- ボス 星喰イ（tier 1）/ 月喰イ（tier 2・第二夜の強化版）----
 export class Boss {
-  constructor(world) {
-    const c = CONFIG.boss;
+  constructor(world, tier = 1) {
+    const base = CONFIG.boss;
+    const c = tier === 2 ? { ...base, ...base.tier2 } : base;
+    this.cfg = c;
+    this.tier = tier;
     this.world = world;
     this.x = world.w * 0.5;
     this.y = -c.radius;
@@ -361,9 +575,10 @@ export class Boss {
     this.t = 0;
     this.flash = 0;
     this.stun = 0;
-    this.rgb = '255,80,200';
+    this.rgb = tier === 2 ? '255,90,90' : '255,80,200';
     this.spitTimer = 2.5;
     this.summonTimer = 5;
+    this.ringTimer = tier === 2 ? 4.5 : Infinity; // 全方位ショットは tier2 のみ
     this.swirl = 0;
     this.defeated = false;
   }
@@ -441,11 +656,12 @@ export class Boss {
     if (this.stun > 0) { this.stun -= dt; return; }
 
     const phaseIdx = clamp(this.phase, 0, this.phases - 1);
+    const cfg = this.cfg;
     // 弾の吐き出し
     this.spitTimer -= dt;
     if (this.spitTimer <= 0) {
-      this.spitTimer = CONFIG.boss.spitEvery[Math.min(phaseIdx, CONFIG.boss.spitEvery.length - 1)];
-      const count = CONFIG.boss.spitCount[Math.min(phaseIdx, CONFIG.boss.spitCount.length - 1)];
+      this.spitTimer = cfg.spitEvery[Math.min(phaseIdx, cfg.spitEvery.length - 1)];
+      const count = cfg.spitCount[Math.min(phaseIdx, cfg.spitCount.length - 1)];
       const spread = 1.1;
       for (let i = 0; i < count; i++) {
         const a = Math.PI / 2 + (i / (count - 1) - 0.5) * spread;
@@ -455,13 +671,38 @@ export class Boss {
       }
       world.audio.hit(0.4);
     }
+    // 全方位ショット（tier2）: 上に撃った弾も噴水のように降ってくる
+    this.ringTimer -= dt;
+    if (this.ringTimer <= 0) {
+      this.ringTimer = cfg.ringEvery;
+      const n = cfg.ringCount;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + this.t;
+        const sp = 240;
+        const shot = new EnemyShot(this.x, this.y, Math.cos(a) * sp, Math.sin(a) * sp);
+        shot.fallSpeed = 190;
+        shot.driftX = Math.cos(a) * sp * 0.5;
+        world.enemies.push(shot);
+      }
+      world.audio.hit(0.6);
+      world.addShake(8);
+    }
     // ミニオン召喚
     this.summonTimer -= dt;
     if (this.summonTimer <= 0) {
-      this.summonTimer = CONFIG.boss.summonEvery[Math.min(phaseIdx, CONFIG.boss.summonEvery.length - 1)];
+      this.summonTimer = cfg.summonEvery[Math.min(phaseIdx, cfg.summonEvery.length - 1)];
       const mx = range(world.w * 0.15, world.w * 0.85);
-      if (Math.random() < 0.5) world.enemies.push(new Drone(mx, range(-40, 0), range(40, 70)));
-      else world.enemies.push(new Meteor(mx, range(-40, 0), range(90, 140)));
+      if (this.tier === 2) {
+        const r = Math.random();
+        if (r < 0.35) world.enemies.push(new Drone(mx, range(-40, 0), range(40, 70)));
+        else if (r < 0.6) world.enemies.push(new Bomber(mx, range(-40, 0), range(70, 110)));
+        else if (r < 0.8) world.enemies.push(new Armor(mx, range(-40, 0), range(45, 65)));
+        else world.enemies.push(new Meteor(mx, range(-40, 0), range(90, 140)));
+      } else if (Math.random() < 0.5) {
+        world.enemies.push(new Drone(mx, range(-40, 0), range(40, 70)));
+      } else {
+        world.enemies.push(new Meteor(mx, range(-40, 0), range(90, 140)));
+      }
     }
   }
 
@@ -493,10 +734,10 @@ export class Boss {
     }
     ctx.globalCompositeOperation = 'source-over';
 
-    // 本体
+    // 本体（tier2 は紅黒）
     const bodyGrad = ctx.createRadialGradient(x, y - radius * 0.3, radius * 0.2, x, y, radius);
-    bodyGrad.addColorStop(0, '#3a0d33');
-    bodyGrad.addColorStop(1, '#0c0210');
+    bodyGrad.addColorStop(0, this.tier === 2 ? '#3d0d10' : '#3a0d33');
+    bodyGrad.addColorStop(1, this.tier === 2 ? '#12020a' : '#0c0210');
     ctx.fillStyle = bodyGrad;
     ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.fill();
 

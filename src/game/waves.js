@@ -7,9 +7,10 @@ import { CONFIG } from '../config.js';
 import { T } from '../i18n.js';
 import { clamp } from '../util.js';
 
-const BOSS_WAVE = 6;
+const BOSS_WAVE = 6;        // 第一夜ボス（星喰イ）
+const FINAL_BOSS_WAVE = 12; // 第二夜ボス（月喰イ）
 
-// ウェーブ定義（1始まり）。boss:true で最終決戦。
+// ウェーブ定義（1始まり）。boss:true でボス戦、final:true で強化ボス（月喰イ）。
 const WAVES = [
   null,
   { spawns: [{ type: 'meteor', count: 6, interval: 1.25, delay: 0.6 }] },
@@ -33,16 +34,48 @@ const WAVES = [
     { type: 'splitter', count: 4, interval: 2.5, delay: 2 },
   ] },
   { boss: true },
+  // ---- 第二夜（wave 7〜） 新しい敵: よろい岩 / バクダン星 ----
+  { spawns: [
+    { type: 'meteor', count: 8, interval: 0.9, delay: 0.3 },
+    { type: 'armor', count: 2, interval: 6, delay: 2 },
+    { type: 'drone', count: 2, interval: 4, delay: 3.5 },
+  ] },
+  { spawns: [
+    { type: 'meteor', count: 8, interval: 0.85, delay: 0.3 },
+    { type: 'bomber', count: 3, interval: 4, delay: 2 },
+    { type: 'splitter', count: 3, interval: 3.5, delay: 4 },
+  ] },
+  { spawns: [
+    { type: 'meteor', count: 10, interval: 0.75, delay: 0.3 },
+    { type: 'armor', count: 3, interval: 4.5, delay: 1.5 },
+    { type: 'drone', count: 3, interval: 3, delay: 3 },
+    { type: 'bomber', count: 2, interval: 5, delay: 6 },
+  ] },
+  { spawns: [
+    { type: 'meteor', count: 12, interval: 0.7, delay: 0.3 },
+    { type: 'splitter', count: 4, interval: 3, delay: 2 },
+    { type: 'bomber', count: 3, interval: 3.5, delay: 4 },
+    { type: 'armor', count: 2, interval: 6, delay: 5 },
+  ] },
+  { spawns: [
+    { type: 'meteor', count: 14, interval: 0.6, delay: 0.3 },
+    { type: 'drone', count: 4, interval: 2.5, delay: 1 },
+    { type: 'armor', count: 3, interval: 4, delay: 2.5 },
+    { type: 'bomber', count: 4, interval: 3, delay: 3.5 },
+  ] },
+  { boss: true, final: true },
 ];
 
 export function getWave(n) {
   if (n < WAVES.length) return WAVES[n];
-  // ボス以降のエンドレス（保険）
-  const k = n - BOSS_WAVE;
+  // 最終ボス以降のエンドレス（保険）
+  const k = n - FINAL_BOSS_WAVE;
   return { spawns: [
     { type: 'meteor', count: 10 + k * 2, interval: Math.max(0.4, 0.8 - k * 0.05), delay: 0.3 },
     { type: 'drone', count: 3 + k, interval: 2, delay: 1 },
     { type: 'splitter', count: 3 + k, interval: 2.4, delay: 2 },
+    { type: 'armor', count: 2 + Math.floor(k / 2), interval: 4, delay: 2.5 },
+    { type: 'bomber', count: 2 + k, interval: 3, delay: 3 },
   ] };
 }
 
@@ -64,14 +97,16 @@ export class WaveDirector {
     const w = this.world;
     this.wave = n;
     w.wave = n;
-    w.speedScale = 1 + (n - 1) * 0.05;
+    w.speedScale = clamp(1 + (n - 1) * 0.045, 1, 1.5);
     w.fireRateScale = clamp(1 - (n - 1) * 0.05, 0.6, 1);
 
     const def = getWave(n);
     if (def.boss) {
       this.state = 'bossIntro';
       this.timer = 2.6;
-      w.setBanner(T.bossIncoming, T.bossWeakpoint, 2.6, '#ff6bd6');
+      this._bossTier = def.final ? 2 : 1;
+      if (def.final) w.setBanner(T.bossIncoming2, T.bossWeakpoint2, 2.6, '#ff6b6b');
+      else w.setBanner(T.bossIncoming, T.bossWeakpoint, 2.6, '#ff6bd6');
       w.audio.bossRoar();
       return;
     }
@@ -129,12 +164,24 @@ export class WaveDirector {
 
       case 'bossIntro':
         this.timer -= dt;
-        if (this.timer <= 0) { w.spawnBoss(); this.state = 'boss'; }
+        if (this.timer <= 0) { w.spawnBoss(this._bossTier || 1); this.state = 'boss'; }
         break;
 
       case 'boss':
         // 勝敗は world 側（onBossDefeated / cityHp）で処理
         break;
+
+      case 'stageBreak': // 第一夜ボス撃破 → 第二夜への幕間
+        this.timer -= dt;
+        if (this.timer <= 0) this.beginWave(this._nextWave);
+        break;
     }
+  }
+
+  // ステージ転換（world._beginStage2 から呼ばれる）
+  beginStageBreak(nextWave, delay) {
+    this.state = 'stageBreak';
+    this.timer = delay;
+    this._nextWave = nextWave;
   }
 }

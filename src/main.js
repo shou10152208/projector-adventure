@@ -129,6 +129,7 @@ function frame(now) {
     window.__dbg = {
       mode: info.mode, phase: world.phase, players: world.guardianCount,
       enemies: world.enemies.length, score: world.score, wave: world.wave,
+      stage: world.stage, pickups: world.pickups.length,
       cityHp: Math.ceil(world.cityHp), gauge: Math.round(world.gauge),
       boss: !!(world.boss && world.boss.alive), fps: info.fps,
       camErr: info.visionError ? (info.visionError.message || '') : '',

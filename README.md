@@ -1,5 +1,7 @@
 # 星守の夜 — STARFALL GUARDIANS
 
+[![CI](https://github.com/shou10152208/projector-adventure/actions/workflows/ci.yml/badge.svg)](https://github.com/shou10152208/projector-adventure/actions/workflows/ci.yml)
+
 > プロジェクターで壁に投影し、Webカメラの前で**全身を動かして**遊ぶ協力型MRゲーム。
 > 夜空の守護者となり、降り注ぐ流星・侵略ドローン・巨大ボス「星喰イ」から街を護れ。
 

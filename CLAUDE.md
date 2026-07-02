@@ -31,7 +31,13 @@ getUserMedia は**セキュアコンテキストでしか動かない** = `https
 ローカルに **Node も JSランタイムも無い**。検証は2段構え:
 - 構文/括弧チェック: テンプレートリテラル対応の簡易スキャナ（過去に使用、`memory/` 参照）。
 - 実ブラウザ確認: **Python版 Playwright + ヘッドレスChromium**（root不要のセットアップ手順は `memory/headless-browser-debug-setup.md`）。`--use-fake-device-for-media-stream` でカメラ経路も検証可。
-- ランタイム状態は `window.__dbg`（`main.js` が毎フレーム更新: `mode/phase/score/wave/cityHp/gauge/camErr/secure...`）から読める。
+- ランタイム状態は `window.__dbg`（`main.js` が毎フレーム更新: `mode/phase/score/wave/cityHp/gauge/camErr/secure/stage/pickups...`）から読める。
+
+### CI（GitHub Actions）
+`.github/workflows/ci.yml` が push(main)/PR で走る。2ジョブ構成:
+- `syntax` — `node --check` で `src/**/*.js` を構文チェック（Node不要な本体に対し、CI側だけ Node を使う）。
+- `browser` — `python3 test/ci_test.py`。server.py を起動し、ヘッドレスChromiumで (1)実アプリ起動→フォールバックで wave 進行、(2)`world.js` 等を直接 import して**第一夜→星喰イ→第二夜→月喰イ→勝利**までフル進行、(3)新敵・アイテムの単体検証。失敗で exit 1。
+- 同じスクリプトはローカルでも実行可: `pip install playwright && python -m playwright install --with-deps chromium && python3 test/ci_test.py`（固定ブラウザを使うなら `PLAYWRIGHT_CHROMIUM_PATH` を指定）。
 
 ## アーキテクチャ / Big picture
 

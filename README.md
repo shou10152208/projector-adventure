@@ -2,6 +2,13 @@
 
 [![CI](https://github.com/shou10152208/projector-adventure/actions/workflows/ci.yml/badge.svg)](https://github.com/shou10152208/projector-adventure/actions/workflows/ci.yml)
 
+## 🎮 いますぐ遊ぶ
+
+**→ https://shou10152208.github.io/projector-adventure/**
+
+インストール不要。ブラウザで開いてカメラを許可するだけで遊べます（`https` 配信なのでスマホ・タブレットでもカメラOK）。
+カメラが無ければそのままマウス／キーボードで遊べます。オフラインで遊ぶ場合は下のクイックスタートへ。
+
 > プロジェクターで壁に投影し、Webカメラの前で**全身を動かして**遊ぶ協力型MRゲーム。
 > 夜空の守護者となり、降り注ぐ流星・侵略ドローン・巨大ボス「星喰イ」から街を護れ。
 
